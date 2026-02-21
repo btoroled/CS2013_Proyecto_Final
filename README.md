@@ -3,10 +3,11 @@
 ## Integrantes
 * Benjamin Toro Leddihn
 * Hector Miguel Espinoza Torres
-* Jossue Guillermo Cáceres Molina
-* Leonardo Medina 
+* Leonardo Medina Gago
 
 
 COMO SE EJECUTA 
+
 LIBRERIAS
+
 CONCLUSIONES 
