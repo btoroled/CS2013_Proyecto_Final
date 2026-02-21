@@ -1,6 +1,6 @@
 /*
  * ============================================================
- * CINEMAX STREAMING PLATFORM
+ * CINEMAX - STREAMING PLATFORM
  * Programación III — Proyecto Final (2026-0)
  *
  * Estructuras usadas:
@@ -201,7 +201,7 @@ void mainMenu(StreamingPlatform& platform) {
 // MAIN
 // ============================================================
 int main(int argc, char* argv[]) {
-    // ── Fix de encoding para Windows ──────────────────────
+    // --Fix de encoding para Windows --------------------------
     // Cambia la terminal a UTF-8 (página de código 65001).
     // Sin esto, los acentos y la ñ se ven como caracteres raros.
     // No afecta el contenido: las sinopsis en inglés o español
