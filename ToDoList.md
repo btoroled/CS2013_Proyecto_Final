@@ -15,7 +15,7 @@
 
 ## B. Carga y preprocesamiento del dataset
 - [ ] Descargar dataset y guardarlo en `data/`
-- [ ] Confirmar separador real (en tu caso es **TSV por tabs**)
+- [ ] Confirmar separador real
 - [ ] Implementar `Catalog::load(file)` que cargue las 1428 filas
 - [ ] Implementar preprocesamiento:
   - [ ] `normalize(text)` → minúsculas + limpiar signos + colapsar espacios
