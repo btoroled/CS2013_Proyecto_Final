@@ -8,7 +8,7 @@
 #include <cctype>
 
 // ============================================================
-// MOVIE — Entidad principal (POO: clase de datos)
+// MOVIE — Entidad principal 
 // ============================================================
 struct Movie {
     int id;                    // índice interno
@@ -25,7 +25,7 @@ struct Movie {
     std::string tagsStr() const {
         std::string s;
         for (size_t i = 0; i < tags.size(); ++i) {
-            if (i) s += ", ";
+            if (i != 0) s += ", ";
             s += tags[i];
         }
         return s;
