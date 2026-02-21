@@ -1,26 +1,25 @@
 #include <iostream>
 
-using namespace std;
-
+#include <iostream>
+#include "include/core/StreamingPlatform.h"
+#include "include/core/UserStore.h"
+#include "include/ui/UI.h"
 
 int main() {
-    std::cout << "================================================="<<endl;
-    std::cout << "  _   _ ______ _______ ______ _      _______   __\n";
-    std::cout << " | \\ | |  ____|__   __|  ____| |    |_   _\\ \\ / /\n";
-    std::cout << " |  \\| | |__     | |  | |__  | |      | |  \\ V / \n";
-    std::cout << " | . ` |  __|    | |  |  __| | |      | |   > <  \n";
-    std::cout << " | |\\  | |____   | |  | |    | |____ _| |_ / . \\ \n";
-    std::cout << " |_| \\_|______|  |_|  |_|    |______|_____/_/ \\_\\\n";
-    std::cout << "                                                 \n";
-    std::cout << "================================================="<<endl;
+    const std::string DATA_FILE = "data/movies.csv"; // ajusta si tu archivo tiene otro nombre
+    const std::string USERS_FILE = "users.txt";
 
-    std::cout << "Selccione su usuario: " << endl;
-
-    for (int i = 0; i < 3;i++) {
-        std::cout << "-------------";
+    StreamingPlatform platform;
+    if (!platform.loadDatasetTSV(DATA_FILE)) {
+        std::cerr << "ERROR: No se pudo leer el dataset: " << DATA_FILE << "\n";
+        return 1;
     }
+    platform.buildIndexes();
 
+    UserStore users;
+    users.load(USERS_FILE); // si no existe, empieza vacío
 
-
+    UI ui(platform, users, USERS_FILE);
+    ui.run();
     return 0;
 }
