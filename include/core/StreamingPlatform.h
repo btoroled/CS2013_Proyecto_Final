@@ -21,7 +21,7 @@ struct SearchResult {
 
 class StreamingPlatform {
 public:
-    bool loadDatasetTSV(const std::string& path); // 6 cols
+    bool loadDataset(const std::string& path); // 6 cols
     void buildIndexes();
 
     // búsqueda general (palabra/frase/substring/tag:)

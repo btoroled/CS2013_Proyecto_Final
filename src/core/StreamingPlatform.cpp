@@ -22,8 +22,8 @@ int StreamingPlatform::idByImdb(const std::string& imdb_id) const {
     return (it == imdb_to_id_.end()) ? -1 : it->second;
 }
 
-bool StreamingPlatform::loadDatasetTSV(const std::string& path) {
-    auto rows = parseSeparatedFile(path, '\t');
+bool StreamingPlatform::loadDataset(const std::string& path) {
+    auto rows = parseSeparatedFile(path, ','); // CSV (coma)
     if (rows.empty()) return false;
 
     // header esperado: imdb_id title plot_synopsis tags split synopsis_source
@@ -44,14 +44,14 @@ bool StreamingPlatform::loadDatasetTSV(const std::string& path) {
         m.imdb_id = row[0];
         m.title = row[1];
         m.plot_synopsis = row[2];
-        string tags_raw = row[3];
+        std::string tags_raw = row[3];
         m.split = row[4];
         m.synopsis_source = row[5];
 
         // tags
         auto rawTags = text::split_tags_raw(tags_raw);
         for (auto& t : rawTags) {
-            string tn = text::normalize_tag(t);
+            std::string tn = text::normalize_tag(t);
             if (!tn.empty()) m.tags.push_back(tn);
         }
 
@@ -62,7 +62,6 @@ bool StreamingPlatform::loadDatasetTSV(const std::string& path) {
 
         imdb_to_id_[m.imdb_id] = m.id;
 
-        // tag index base
         for (auto& t : m.tags) tag_to_movies_[t].push_back(m.id);
 
         movies_.push_back(std::move(m));

@@ -25,6 +25,8 @@ public:
         }
     }
 
+
+
     void finalize() {
         for (auto& v : postings_) {
             std::sort(v.begin(), v.end());

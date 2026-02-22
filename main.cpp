@@ -10,7 +10,7 @@ int main() {
     const std::string USERS_FILE = "users.txt";
 
     StreamingPlatform platform;
-    if (!platform.loadDatasetTSV(DATA_FILE)) {
+    if (!platform.loadDataset(DATA_FILE)) {
         std::cerr << "ERROR: No se pudo leer el dataset: " << DATA_FILE << "\n";
         return 1;
     }
