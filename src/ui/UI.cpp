@@ -291,6 +291,7 @@ void UI::searchScreen(int slot) {
             pause();
             continue;
         }
+        lastQuery_ = q;
         searchResultsScreen(slot, res, "SEARCH RESULTS");
     }
 }
