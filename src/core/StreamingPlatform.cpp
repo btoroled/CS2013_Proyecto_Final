@@ -23,7 +23,7 @@ int StreamingPlatform::idByImdb(const std::string& imdb_id) const {
 }
 
 bool StreamingPlatform::loadDatasetTSV(const std::string& path) {
-    auto rows = parseSeparatedFile(path, '\t');
+    auto rows = parseSeparatedFile(path, ',');
     if (rows.empty()) return false;
 
     // header esperado: imdb_id title plot_synopsis tags split synopsis_source
