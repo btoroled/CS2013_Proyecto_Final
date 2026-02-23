@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <iostream>
 #include <limits>
+#include <sstream> //se necesita para istringstream
 #include "../../include/text/TextUtils.h"
 
 using namespace std;
@@ -186,6 +187,31 @@ void UI::movieDetailScreen(int slot, int movie_id) {
     }
 }
 
+// Extrae ~120 chars alrededor del primer token del query encontrado en el texto.
+// Muestra al usuario POR QUÉ apareció esa película en los resultados.
+static string getSnippet(const string& text, const string& query) {
+    if (query.empty() || text.empty()) return "";
+
+    string textLow = text, queryLow = query;
+    transform(textLow.begin(), textLow.end(), textLow.begin(),
+        [](unsigned char c){ return tolower(c); });
+    transform(queryLow.begin(), queryLow.end(), queryLow.begin(),
+        [](unsigned char c){ return tolower(c); });
+
+    // Probar cada token hasta encontrar uno en el texto
+    istringstream iss(queryLow);
+    string tok;
+    while (iss >> tok) {
+        size_t pos = textLow.find(tok);
+        if (pos == std::string::npos) continue;
+        size_t start = (pos > 40) ? pos - 40 : 0;
+        return (start > 0 ? "..." : "")
+             + text.substr(start, 120)
+             + (start + 120 < text.size() ? "..." : "");
+    }
+    return "";
+}
+
 void UI::searchResultsScreen(int slot, const vector<SearchResult>& results, const string& title) {
     const int PAGE = 5;
     int page = 0;
@@ -204,6 +230,15 @@ void UI::searchResultsScreen(int slot, const vector<SearchResult>& results, cons
             for (int i = start; i < end; i++) {
                 const Movie& m = platform_.movieById(results[i].movie_id);
                 cout << (i - start + 1) << ") " << m.title << "  [score=" << results[i].score << "]\n";
+                
+                // Mostrar dónde apareció el match - título o sinopsis
+                bool inTitle = (m.title_norm.find(text::normalize_ascii(lastQuery_)) != string::npos);
+                string snip = getSnippet(m.plot_synopsis, lastQuery_);
+            
+                if (inTitle)
+                    cout << "   >> Match en titulo\n";
+                else if (!snip.empty())
+                    cout << "   >> \"" << snip << "\"\n";            
             }
             cout << "\n";
         }
