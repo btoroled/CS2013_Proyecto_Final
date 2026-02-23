@@ -160,7 +160,11 @@ void UI::movieDetailScreen(int slot, int movie_id) {
         cout << "\n\n";
 
         cout << "Sinopsis:\n";
-        cout << m.plot_synopsis << "\n\n";
+        // Mostrar sinopsis cortada a 600 chars para legibilidad
+        string syn = m.plot_synopsis;
+        if (syn.size() > 600)
+            syn = syn.substr(0, 600) + "...\n[IMDB: https://www.imdb.com/title/" + m.imdb_id + "/]";
+        cout << syn << "\n\n";
 
         bool liked = isLiked(user, m.imdb_id);
         bool wl = inWatchLater(user, m.imdb_id);
