@@ -227,3 +227,5 @@ El sistema contempla:
 - La persistencia permite mantener historial entre ejecuciones.
 
 ---
+
+
