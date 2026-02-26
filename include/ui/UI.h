@@ -33,7 +33,10 @@ private:
     void homeScreen(int slot);
     void searchScreen(int slot);
     void listMoviesScreen(int slot, const std::vector<int>& movie_ids, const std::string& title);
-    void searchResultsScreen(int slot, const std::vector<SearchResult>& results, const std::string& title, const std::string& query = "");
+    void searchResultsScreen(int slot,
+    const std::vector<SearchResult>& results,
+    const std::string& title,
+    const std::string& query = "");
     void movieDetailScreen(int slot, int movie_id);
 
     // render

@@ -22,8 +22,8 @@ int StreamingPlatform::idByImdb(const std::string& imdb_id) const {
     return (it == imdb_to_id_.end()) ? -1 : it->second;
 }
 
-bool StreamingPlatform::loadDatasetTSV(const std::string& path) {
-    auto rows = parseSeparatedFile(path, ',');
+bool StreamingPlatform::loadDataset(const std::string& path) {
+    auto rows = parseSeparatedFile(path, ','); // CSV (coma)
     if (rows.empty()) return false;
 
     // header esperado: imdb_id title plot_synopsis tags split synopsis_source
@@ -44,14 +44,14 @@ bool StreamingPlatform::loadDatasetTSV(const std::string& path) {
         m.imdb_id = row[0];
         m.title = row[1];
         m.plot_synopsis = row[2];
-        string tags_raw = row[3];
+        std::string tags_raw = row[3];
         m.split = row[4];
         m.synopsis_source = row[5];
 
         // tags
         auto rawTags = text::split_tags_raw(tags_raw);
         for (auto& t : rawTags) {
-            string tn = text::normalize_tag(t);
+            std::string tn = text::normalize_tag(t);
             if (!tn.empty()) m.tags.push_back(tn);
         }
 
@@ -62,7 +62,6 @@ bool StreamingPlatform::loadDatasetTSV(const std::string& path) {
 
         imdb_to_id_[m.imdb_id] = m.id;
 
-        // tag index base
         for (auto& t : m.tags) tag_to_movies_[t].push_back(m.id);
 
         movies_.push_back(std::move(m));
@@ -202,64 +201,40 @@ vector<SearchResult> StreamingPlatform::search(const std::string& user_input) co
 }
 
 vector<int> StreamingPlatform::recommend(const User& u, int k) const {
-    // Métrica 1: Perfil de tags basado en likes
+    // perfil de tags basado en likes
     unordered_map<string, int> tagFreq;
-    
-    //Métrica 2: palabras frecuentes en títulos likeados
-    unordered_map<string, int> wordFreq;
 
     for (const auto& imdb : u.liked) {
         int id = idByImdb(imdb);
         if (id < 0) continue;
-        // acumular tags
-        for (const auto& t : movies_[id].tags)
-            tagFreq[t]++;
-        // acumular palabras del título
-        for (const auto& w : text::split_words(movies_[id].title_norm))
-            if (w.size() >= 3) wordFreq[w]++; // ignorar palabras muy cortas
+        for (const auto& t : movies_[id].tags) tagFreq[t]++;
     }
 
-    
     // si no hay likes, recomendar random global
     if (tagFreq.empty()) {
         vector<int> all;
         all.reserve(movies_.size());
         for (const auto& m : movies_) all.push_back(m.id);
+
         std::mt19937 rng((unsigned)std::random_device{}());
         std::shuffle(all.begin(), all.end(), rng);
         if ((int)all.size() > k) all.resize(k);
         return all;
     }
 
-    // Excluir liked y watch_later
-    unordered_set<string> excluded = u.liked;
-    for (const auto& imdb : u.watch_later)
-        excluded.insert(imdb);
-
-    //Scoring: 
-    //score = Σ tagFreq[tag] * 2  (peso mayor)
-    //        + Σ wordFreq[word]    (bonus por palabras del título)
+    unordered_set<string> likedSet = u.liked;
 
     vector<pair<int,double>> scored;
     scored.reserve(movies_.size());
 
     for (const auto& m : movies_) {
-        if (excluded.count(m.imdb_id)) continue;
+        if (likedSet.count(m.imdb_id)) continue; // no recomendar ya likeado
 
         double s = 0.0;
-
-        // componente 1: similitud por tags
         for (const auto& t : m.tags) {
             auto it = tagFreq.find(t);
-            if (it != tagFreq.end()) s += it->second*2.0;
+            if (it != tagFreq.end()) s += it->second;
         }
-
-        // componente 2: bonus por palabras frecuentes en título
-        for (const auto& w : text::split_words(m.title_norm)) {
-            auto it = wordFreq.find(w);
-            if (it != wordFreq.end()) s += it->second * 1.0;
-        }
-        
         if (s > 0.0) scored.push_back({m.id, s});
     }
 
@@ -271,6 +246,7 @@ vector<int> StreamingPlatform::recommend(const User& u, int k) const {
     vector<int> out;
     for (int i = 0; i < (int)scored.size() && (int)out.size() < k; i++)
         out.push_back(scored[i].first);
+
     return out;
 }
 
