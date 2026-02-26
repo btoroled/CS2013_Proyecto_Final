@@ -11,6 +11,17 @@
 
 using namespace std;
 
+#include "../../include/ui/UI.h"
+
+#include <algorithm>
+#include <array>
+#include <iostream>
+#include <limits>
+#include <sstream>
+#include "../../include/text/TextUtils.h"
+
+using namespace std;
+
 UI::UI(StreamingPlatform& platform, UserStore& users, const std::string& usersFile)
     : platform_(platform), users_(users), usersFile_(usersFile) {}
 
@@ -159,7 +170,10 @@ void UI::movieDetailScreen(int slot, int movie_id) {
         cout << "\n\n";
 
         cout << "Sinopsis:\n";
-        cout << m.plot_synopsis << "\n\n";
+        string syn = m.plot_synopsis;
+        if (syn.size() > 600)
+            syn = syn.substr(0, 600) + "...\n[IMDB: https://www.imdb.com/title/" + m.imdb_id + "/]";
+        cout << syn << "\n\n";
 
         bool liked = isLiked(user, m.imdb_id);
         bool wl = inWatchLater(user, m.imdb_id);
@@ -186,7 +200,35 @@ void UI::movieDetailScreen(int slot, int movie_id) {
     }
 }
 
-void UI::searchResultsScreen(int slot, const vector<SearchResult>& results, const string& title) {
+// Extrae ~120 chars alrededor del primer token del query encontrado en el texto.
+static string getSnippet(const string& text, const string& query) {
+    if (query.empty() || text.empty()) return "";
+
+    string textLow = text, queryLow = query;
+    transform(textLow.begin(), textLow.end(), textLow.begin(),
+        [](unsigned char c){ return tolower(c); });
+    transform(queryLow.begin(), queryLow.end(), queryLow.begin(),
+        [](unsigned char c){ return tolower(c); });
+
+    istringstream iss(queryLow);
+    string tok;
+    while (iss >> tok) {
+        size_t pos = textLow.find(tok);
+        if (pos == std::string::npos) continue;
+        size_t start = (pos > 40) ? pos - 40 : 0;
+        return (start > 0 ? "..." : "")
+             + text.substr(start, 120)
+             + (start + 120 < text.size() ? "..." : "");
+    }
+    return "";
+}
+
+void UI::searchResultsScreen(int slot,
+    const vector<SearchResult>& results,
+    const string& title,
+    const string& query) {
+    lastQuery_ = query;
+
     const int PAGE = 5;
     int page = 0;
 
@@ -201,9 +243,19 @@ void UI::searchResultsScreen(int slot, const vector<SearchResult>& results, cons
         if (start >= (int)results.size()) {
             cout << "No hay mas resultados.\n\n";
         } else {
+            const string q_norm = text::normalize_ascii(lastQuery_);
+
             for (int i = start; i < end; i++) {
                 const Movie& m = platform_.movieById(results[i].movie_id);
                 cout << (i - start + 1) << ") " << m.title << "  [score=" << results[i].score << "]\n";
+
+                if (!q_norm.empty()) {
+                    bool inTitle = (m.title_norm.find(q_norm) != string::npos);
+                    string snip = getSnippet(m.plot_synopsis, lastQuery_);
+
+                    if (inTitle) cout << "   >> Match en titulo\n";
+                    else if (!snip.empty()) cout << "   >> \"" << snip << "\"\n";
+                }
             }
             cout << "\n";
         }
@@ -218,7 +270,6 @@ void UI::searchResultsScreen(int slot, const vector<SearchResult>& results, cons
         if (cmd == "n") { if ((page + 1) * PAGE < (int)results.size()) page++; continue; }
         if (cmd == "p") { if (page > 0) page--; continue; }
 
-        // número 1..5
         if (!cmd.empty() && all_of(cmd.begin(), cmd.end(), ::isdigit)) {
             int k = stoi(cmd);
             if (k >= 1 && k <= (end - start)) {
@@ -233,7 +284,7 @@ void UI::listMoviesScreen(int slot, const vector<int>& movie_ids, const string& 
     vector<SearchResult> tmp;
     tmp.reserve(movie_ids.size());
     for (int id : movie_ids) tmp.push_back(SearchResult{id, 1.0});
-    searchResultsScreen(slot, tmp, title);
+    searchResultsScreen(slot, tmp, title, "");
 }
 
 void UI::searchScreen(int slot) {
@@ -256,7 +307,7 @@ void UI::searchScreen(int slot) {
             pause();
             continue;
         }
-        searchResultsScreen(slot, res, "SEARCH RESULTS");
+        searchResultsScreen(slot, res, "SEARCH RESULTS", q);
     }
 }
 
@@ -268,7 +319,6 @@ void UI::homeScreen(int slot) {
         cout << "=== HOME ===\n";
         cout << "Perfil: " << u.name << "\n\n";
 
-        // Sección: recomendaciones
         auto rec = platform_.recommend(u, 5);
         cout << "Recomendaciones:\n";
         if (rec.empty()) cout << "  (sin recomendaciones)\n";
@@ -278,7 +328,6 @@ void UI::homeScreen(int slot) {
         }
         cout << "\n";
 
-        // Sección: ver más tarde
         cout << "Ver mas tarde:\n";
         if (u.watch_later.empty()) cout << "  (vacio)\n";
         else {
@@ -290,7 +339,6 @@ void UI::homeScreen(int slot) {
         }
         cout << "\n";
 
-        // Sección: top tags + random 5
         auto tags = platform_.topTags(5);
         cout << "Categorias (top tags):\n";
         for (size_t i = 0; i < tags.size(); i++) cout << "  " << (i+1) << ") " << tags[i] << "\n";

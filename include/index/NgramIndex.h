@@ -4,6 +4,7 @@
 
 #ifndef INC_1_NGRAMINDEX_H
 #define INC_1_NGRAMINDEX_H
+
 #include <algorithm>
 #include <string>
 #include <vector>
@@ -25,8 +26,6 @@ public:
         }
     }
 
-
-
     void finalize() {
         for (auto& v : postings_) {
             std::sort(v.begin(), v.end());
@@ -40,7 +39,6 @@ public:
         return &postings_[term_id];
     }
 
-    // Intersección de postings de todos los ngrams del query.
     std::vector<int> candidatesForCompactQuery(const std::string& q_compact) const {
         if ((int)q_compact.size() < n_) return {};
 
@@ -48,12 +46,11 @@ public:
         for (int i = 0; i + n_ <= (int)q_compact.size(); i++) {
             std::string ng = q_compact.substr(i, n_);
             const auto* lst = lookup(ng);
-            if (!lst) return {}; // si falta un ngram, no hay candidatos
+            if (!lst) return {};
             lists.push_back(*lst);
         }
         if (lists.empty()) return {};
 
-        // intersecta en cadena, empezando por la más chica
         std::sort(lists.begin(), lists.end(),
                   [](const auto& a, const auto& b){ return a.size() < b.size(); });
 
@@ -67,7 +64,7 @@ public:
 private:
     int n_;
     Trie trie_;
-    std::vector<std::vector<int>> postings_; // term_id -> sorted movie_ids
+    std::vector<std::vector<int>> postings_;
 
     static std::vector<int> intersectSorted(const std::vector<int>& a, const std::vector<int>& b) {
         std::vector<int> out;
@@ -81,6 +78,5 @@ private:
         return out;
     }
 };
-
 
 #endif //INC_1_NGRAMINDEX_H
