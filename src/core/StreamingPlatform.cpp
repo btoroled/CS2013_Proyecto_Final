@@ -201,13 +201,20 @@ vector<SearchResult> StreamingPlatform::search(const std::string& user_input) co
 }
 
 vector<int> StreamingPlatform::recommend(const User& u, int k) const {
-    // perfil de tags basado en likes
+    // Métrica 1: Perfil de tags basado en likes
     unordered_map<string, int> tagFreq;
 
+     //Métrica 2: palabras frecuentes en títulos likeados
+    unordered_map<string, int> wordFreq;
+    
     for (const auto& imdb : u.liked) {
         int id = idByImdb(imdb);
         if (id < 0) continue;
+        //acumular tags
         for (const auto& t : movies_[id].tags) tagFreq[t]++;
+        // acumular palabras del título
+        for (const auto& w : text::split_words(movies_[id].title_norm))
+            if (w.size() >= 3) wordFreq[w]++; // ignorar palabras muy cortas
     }
 
     // si no hay likes, recomendar random global
@@ -222,18 +229,33 @@ vector<int> StreamingPlatform::recommend(const User& u, int k) const {
         return all;
     }
 
-    unordered_set<string> likedSet = u.liked;
+    // Excluir liked y watch_later
+    unordered_set<string> excluded = u.liked;
+    for (const auto& imdb : u.watch_later)
+        excluded.insert(imdb);
 
+    //Scoring: 
+        //score = Σ tagFreq[tag] * 2  (peso mayor)
+        //        + Σ wordFreq[word]    (bonus por palabras del título)
+
+    
     vector<pair<int,double>> scored;
     scored.reserve(movies_.size());
 
     for (const auto& m : movies_) {
-        if (likedSet.count(m.imdb_id)) continue; // no recomendar ya likeado
+        if (excluded.count(m.imdb_id)) continue; // no recomendar ya likeado
 
         double s = 0.0;
+
+        // componente 1: similitud por tags
         for (const auto& t : m.tags) {
             auto it = tagFreq.find(t);
-            if (it != tagFreq.end()) s += it->second;
+            if (it != tagFreq.end()) s += it->second*2.0;
+        }
+        // componente 2: bonus por palabras frecuentes en título
+        for (const auto& w : text::split_words(m.title_norm)) {
+            auto it = wordFreq.find(w);
+            if (it != wordFreq.end()) s += it->second * 1.0;
         }
         if (s > 0.0) scored.push_back({m.id, s});
     }
