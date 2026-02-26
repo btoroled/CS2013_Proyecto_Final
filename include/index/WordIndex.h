@@ -19,6 +19,8 @@ struct HitCount {
 };
 
 class WordIndex {
+    Trie trie_;
+    std::vector<std::unordered_map<int, HitCount>> postings_;
 public:
     enum class Source { Title, Synopsis, Tag };
 
@@ -41,9 +43,21 @@ public:
         return &postings_[term_id];
     }
 
-private:
-    Trie trie_;
-    std::vector<std::unordered_map<int, HitCount>> postings_; // term_id -> {movie_id -> hitcount}
+    void addHit(const std::string& token, int movie_id, const HitCount& delta) {
+        if (token.empty()) return;
+        int term_id = trie_.insertAndGetId(token);
+        if ((int)postings_.size() <= term_id) postings_.resize(term_id + 1);
+
+        HitCount& h = postings_[term_id][movie_id];
+        auto add_sat = [](uint16_t& x, uint16_t d) {
+            uint32_t s = (uint32_t)x + (uint32_t)d;
+            x = (s > 65535u) ? (uint16_t)65535u : (uint16_t)s;
+        };
+        add_sat(h.title,    delta.title);
+        add_sat(h.synopsis, delta.synopsis);
+        add_sat(h.tag,      delta.tag);
+    }
+
 };
 
 #endif //INC_1_WORDINDEX_H

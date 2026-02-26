@@ -3,6 +3,8 @@ project(1)
 
 set(CMAKE_CXX_STANDARD 20)
 
+find_package(Threads REQUIRED)
+
 add_executable(1 main.cpp
         src/core/Movie.cpp
         include/core/Movie.h

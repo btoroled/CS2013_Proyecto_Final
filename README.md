@@ -207,16 +207,25 @@ El sistema contempla:
 - Persistencia segura de usuarios (si el archivo no existe, inicia vacío).
 
 ---
-## Benchmarks / tiempos (plantilla)
+## Benchmarks / tiempos 
 
+Dataset: data/movies.csv
+N peliculas: 14828
+Queries usadas:
+- palabra: "tre"
+- frase:   "note this"
+- tag:     "tag:murder"
+  (sink=306492)
 
 | Operación             | Tamaño dataset | Tiempo (ms) | Notas              |
 |----------------------|---------------:|------------:|-------------------|
-| Carga dataset        | N películas    | ___         | lectura + parsing |
-| Build de índices     | N películas    | ___         | WordIndex + Ngram |
-| Búsqueda (1 palabra) | N películas    | ___         | promedio 10 runs  |
-| Búsqueda (frase)     | N películas    | ___         | promedio 10 runs  |
-| Búsqueda `tag:...`   | N películas    | ___         | lookup por tag    |
+| Carga dataset        | 14828 películas | 5144.398 | lectura + parsing |
+| Build de índices     | 14828 películas | 34018.394 | WordIndex + Ngram |
+| Búsqueda (1 palabra) | 14828 películas | 74.951 | promedio 10 runs  |
+| Búsqueda (frase)     | 14828 películas | 31.366 | promedio 10 runs  |
+| Búsqueda `tag:...`   | 14828 películas | 11.912 | lookup por tag    |
+
+
 
 ---
 ## Conclusiones

@@ -26,6 +26,14 @@ public:
         }
     }
 
+    void addNgramList(const std::string& ngram, const std::vector<int>& movie_ids) {
+        if ((int)ngram.size() != n_) return;
+        int term_id = trie_.insertAndGetId(ngram);
+        if ((int)postings_.size() <= term_id) postings_.resize(term_id + 1);
+        auto& v = postings_[term_id];
+        v.insert(v.end(), movie_ids.begin(), movie_ids.end());
+    }
+
     void finalize() {
         for (auto& v : postings_) {
             std::sort(v.begin(), v.end());

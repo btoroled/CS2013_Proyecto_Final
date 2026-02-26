@@ -7,6 +7,9 @@
 #include <fstream>
 #include <random>
 #include <unordered_set>
+#include <thread>
+#include <unordered_map>
+#include <utility>
 #include "../../include/text/TextUtils.h"
 
 using namespace std;
@@ -70,6 +73,13 @@ bool StreamingPlatform::loadDataset(const std::string& path) {
     return !movies_.empty();
 }
 
+unsigned StreamingPlatform::effectiveThreads(size_t work) const {
+    unsigned T = thread_count_ ? thread_count_ : std::thread::hardware_concurrency();
+    if (T == 0) T = 1;
+    if (work > 0) T = std::min<unsigned>(T, (unsigned)work);
+    return T;
+}
+
 void StreamingPlatform::buildIndexes() {
     wordIndex_ = WordIndex{};
     ngramIndex_ = NgramIndex{3};
@@ -89,6 +99,132 @@ void StreamingPlatform::buildIndexes() {
 
         // substring index (trigramas) sobre title+synopsis compact
         ngramIndex_.addTextCompact(m.compact, m.id);
+    }
+
+    ngramIndex_.finalize();
+}
+
+void StreamingPlatform::buildIndexesParallel() {
+    wordIndex_ = WordIndex{};
+    ngramIndex_ = NgramIndex{3};
+    if (movies_.empty()) return;
+
+    unsigned T = effectiveThreads(movies_.size());
+    if (T == 0) T = 1;
+    T = std::min<unsigned>(T, (unsigned)movies_.size());
+    if (T <= 1) {
+        buildIndexes();
+        return;
+    }
+
+    using LocalWordMap  = std::unordered_map<std::string, std::unordered_map<int, HitCount>>;
+    using LocalNgramMap = std::unordered_map<std::string, std::vector<int>>;
+
+    std::vector<LocalWordMap>  localWords(T);
+    std::vector<LocalNgramMap> localNgrams(T);
+
+    const size_t n = movies_.size();
+    const size_t chunk = (n + T - 1) / T;
+
+    std::vector<std::thread> threads;
+    threads.reserve(T);
+
+    for (unsigned ti = 0; ti < T; ti++) {
+        const size_t begin = (size_t)ti * chunk;
+        const size_t end   = std::min(n, begin + chunk);
+
+        threads.emplace_back([&, ti, begin, end]() {
+            auto& W = localWords[ti];
+            auto& G = localNgrams[ti];
+
+            auto inc = [](HitCount& h, WordIndex::Source src) {
+                switch (src) {
+                    case WordIndex::Source::Title:    h.title++; break;
+                    case WordIndex::Source::Synopsis: h.synopsis++; break;
+                    case WordIndex::Source::Tag:      h.tag++; break;
+                }
+            };
+
+            for (size_t i = begin; i < end; i++) {
+                const auto& m = movies_[i];
+
+                for (auto& w : text::split_words(m.title_norm)) {
+                    inc(W[w][m.id], WordIndex::Source::Title);
+                }
+
+                for (auto& w : text::split_words(m.synopsis_norm)) {
+                    inc(W[w][m.id], WordIndex::Source::Synopsis);
+                }
+
+                for (auto& t : m.tags) {
+                    inc(W[t][m.id], WordIndex::Source::Tag);
+                }
+
+                if ((int)m.compact.size() >= ngramIndex_.n()) {
+                    const int nn = ngramIndex_.n();
+                    for (int pos = 0; pos + nn <= (int)m.compact.size(); pos++) {
+                        std::string ng = m.compact.substr(pos, nn);
+                        G[ng].push_back(m.id);
+                    }
+                }
+            }
+        });
+    }
+
+    for (auto& th : threads) th.join();
+
+    // =========================
+    // Merge WordIndex (token -> movie_id -> HitCount)
+    // =========================
+    LocalWordMap mergedWords;
+    auto add_sat = [](uint16_t& x, uint16_t d) {
+        uint32_t s = (uint32_t)x + (uint32_t)d;
+        x = (s > 65535u) ? (uint16_t)65535u : (uint16_t)s;
+    };
+
+    for (auto& part : localWords) {
+        for (auto& [tok, postings] : part) {
+            auto& dstPost = mergedWords[tok];
+            for (auto& [movie_id, hit] : postings) {
+                HitCount& dst = dstPost[movie_id];
+                add_sat(dst.title,    hit.title);
+                add_sat(dst.synopsis, hit.synopsis);
+                add_sat(dst.tag,      hit.tag);
+            }
+        }
+    }
+
+    // Construcción determinística (ordenada) para que sea reproducible.
+    std::vector<std::string> tokens;
+    tokens.reserve(mergedWords.size());
+    for (const auto& kv : mergedWords) tokens.push_back(kv.first);
+    std::sort(tokens.begin(), tokens.end());
+
+    for (const auto& tok : tokens) {
+        const auto& postings = mergedWords[tok];
+        for (const auto& [movie_id, hit] : postings) {
+            wordIndex_.addHit(tok, movie_id, hit);
+        }
+    }
+
+    // =========================
+    // Merge NgramIndex (ngram -> [movie_id...])
+    // =========================
+    LocalNgramMap mergedNgrams;
+    for (auto& part : localNgrams) {
+        for (auto& [ng, ids] : part) {
+            auto& dst = mergedNgrams[ng];
+            dst.insert(dst.end(), ids.begin(), ids.end());
+        }
+    }
+
+    std::vector<std::string> ngrams;
+    ngrams.reserve(mergedNgrams.size());
+    for (const auto& kv : mergedNgrams) ngrams.push_back(kv.first);
+    std::sort(ngrams.begin(), ngrams.end());
+
+    for (const auto& ng : ngrams) {
+        ngramIndex_.addNgramList(ng, mergedNgrams[ng]);
     }
 
     ngramIndex_.finalize();
@@ -161,11 +297,43 @@ vector<SearchResult> StreamingPlatform::search(const std::string& user_input) co
             }
         }
     } else if (tokens.size() == 1 && (int)q_compact.size() > 0 && (int)q_compact.size() < ngramIndex_.n()) {
-        // fallback para query muy corta (1-2 chars): escaneo simple (dataset pequeño)
-        for (const auto& m : movies_) {
-            if (m.compact.find(q_compact) != string::npos) {
-                substringOK.insert(m.id);
-                acc.try_emplace(m.id, HitCount{});
+        unsigned T = effectiveThreads(movies_.size());
+        if (T == 0) T = 1;
+
+        if (T <= 1 || movies_.size() < 4000) {
+            for (const auto& m : movies_) {
+                if (m.compact.find(q_compact) != string::npos) {
+                    substringOK.insert(m.id);
+                    acc.try_emplace(m.id, HitCount{});
+                }
+            }
+        } else {
+            T = std::min<unsigned>(T, (unsigned)movies_.size());
+            const size_t n = movies_.size();
+            const size_t chunk = (n + T - 1) / T;
+
+            std::vector<std::vector<int>> localHits(T);
+            std::vector<std::thread> threads;
+            threads.reserve(T);
+
+            for (unsigned ti = 0; ti < T; ti++) {
+                const size_t begin = (size_t)ti * chunk;
+                const size_t end   = std::min(n, begin + chunk);
+                threads.emplace_back([&, ti, begin, end]() {
+                    auto& out = localHits[ti];
+                    for (size_t i = begin; i < end; i++) {
+                        const auto& m = movies_[i];
+                        if (m.compact.find(q_compact) != string::npos) out.push_back(m.id);
+                    }
+                });
+            }
+            for (auto& th : threads) th.join();
+
+            for (const auto& v : localHits) {
+                for (int id : v) {
+                    substringOK.insert(id);
+                    acc.try_emplace(id, HitCount{});
+                }
             }
         }
     }
@@ -225,17 +393,59 @@ vector<int> StreamingPlatform::recommend(const User& u, int k) const {
     unordered_set<string> likedSet = u.liked;
 
     vector<pair<int,double>> scored;
-    scored.reserve(movies_.size());
+    unsigned T = effectiveThreads(movies_.size());
+    if (T == 0) T = 1;
 
-    for (const auto& m : movies_) {
-        if (likedSet.count(m.imdb_id)) continue; // no recomendar ya likeado
+    if (T <= 1 || movies_.size() < 4000) {
+        scored.reserve(movies_.size());
+        for (const auto& m : movies_) {
+            if (likedSet.count(m.imdb_id)) continue;
 
-        double s = 0.0;
-        for (const auto& t : m.tags) {
-            auto it = tagFreq.find(t);
-            if (it != tagFreq.end()) s += it->second;
+            double s = 0.0;
+            for (const auto& t : m.tags) {
+                auto it = tagFreq.find(t);
+                if (it != tagFreq.end()) s += it->second;
+            }
+            if (s > 0.0) scored.push_back({m.id, s});
         }
-        if (s > 0.0) scored.push_back({m.id, s});
+    } else {
+        T = std::min<unsigned>(T, (unsigned)movies_.size());
+        const size_t n = movies_.size();
+        const size_t chunk = (n + T - 1) / T;
+
+        std::vector<std::vector<pair<int,double>>> localScored(T);
+        std::vector<std::thread> threads;
+        threads.reserve(T);
+
+        for (unsigned ti = 0; ti < T; ti++) {
+            const size_t begin = (size_t)ti * chunk;
+            const size_t end   = std::min(n, begin + chunk);
+
+            threads.emplace_back([&, ti, begin, end]() {
+                auto& out = localScored[ti];
+                out.reserve((end - begin) / 2 + 8);
+
+                for (size_t i = begin; i < end; i++) {
+                    const auto& m = movies_[i];
+                    if (likedSet.count(m.imdb_id)) continue;
+
+                    double s = 0.0;
+                    for (const auto& t : m.tags) {
+                        auto it = tagFreq.find(t);
+                        if (it != tagFreq.end()) s += it->second;
+                    }
+                    if (s > 0.0) out.push_back({m.id, s});
+                }
+            });
+        }
+        for (auto& th : threads) th.join();
+
+        size_t total = 0;
+        for (const auto& v : localScored) total += v.size();
+        scored.reserve(total);
+        for (auto& v : localScored) {
+            scored.insert(scored.end(), v.begin(), v.end());
+        }
     }
 
     sort(scored.begin(), scored.end(), [&](auto& a, auto& b){
