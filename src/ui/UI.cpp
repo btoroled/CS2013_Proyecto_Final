@@ -1,16 +1,6 @@
 //
 // Created by Benjamin Toro Leddihn on 21/02/26.
 //
-
-#include "../../include/ui/UI.h"
-
-#include <algorithm>
-#include <iostream>
-#include <limits>
-#include "../../include/text/TextUtils.h"
-
-using namespace std;
-
 #include "../../include/ui/UI.h"
 
 #include <algorithm>
