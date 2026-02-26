@@ -1,16 +1,12 @@
-//
-// Created by Benjamin Toro Leddihn on 21/02/26.
-//
-
-// TextUtils.h
-// Utilidades de normalización y parsing de texto para búsquedas e índices.
-
 #ifndef INC_1_TEXTUTILS_H
 #define INC_1_TEXTUTILS_H
 
+#include <algorithm>
+#include <cctype>
 #include <string>
 #include <string_view>
 #include <vector>
+#include <regex>
 
 namespace text {
 
@@ -50,5 +46,4 @@ std::string generate_compact_summary(std::string_view norm, int limitWords = 30)
 
 } // namespace text
 
-
-#endif //INC_1_TEXTUTILS_H
+#endif

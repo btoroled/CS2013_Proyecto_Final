@@ -1,12 +1,4 @@
-//
-// Created by Benjamin Toro Leddihn on 21/02/26.
-//
-
 #include "../../include/text/TextUtils.h"
-
-#include <algorithm>
-#include <cctype>
-#include <regex>
 
 void text::ltrim_in_place(std::string& s) {
     size_t i = 0;
@@ -127,7 +119,6 @@ std::vector<std::string> text::split_tags_raw(std::string_view raw) {
     trim_in_place(s);
     if (s.empty()) return {};
 
-    // Caso JSON-ish: ["tag1", "tag2"] / ['tag1','tag2']
     if (!s.empty() && (s.front() == '[' && s.back() == ']')) {
         std::vector<std::string> out;
         std::string cur;
@@ -151,7 +142,6 @@ std::vector<std::string> text::split_tags_raw(std::string_view raw) {
         if (!out.empty()) return out;
     }
 
-    // Caso CSV-ish: tag1,tag2;tag3|tag4
     std::vector<std::string> out;
     std::string cur;
     for (char c : s) {
@@ -168,20 +158,15 @@ std::vector<std::string> text::split_tags_raw(std::string_view raw) {
     return out;
 }
 
-void text::remove_meta_text(std::string& text) {
-    // Ejemplos: "Note:", "Warning:", "This synopsis ..." etc.
-    static const std::regex metaRegex(
-        "^(?:Note:|Warning:|This synopsis).*?(?:\\.|- )",
-        std::regex_constants::icase
-    );
-    text = std::regex_replace(text, metaRegex, "");
+void text::remove_meta_text(std::string& texto) {
+    static const std::regex metaRegex("^(?:Note:|Warning:|This synopsis).*?(?:\\.|- )", std::regex_constants::icase);
+    texto = std::regex_replace(texto, metaRegex, "");
 }
 
-std::string text::generate_compact_summary(std::string_view norm, int limitWords) {
+std::string text::generate_compact_summary(std::string_view norm, int limit) {
     std::vector<std::string> words = split_words(norm);
     std::string out;
-
-    int count = std::min(limitWords, (int)words.size());
+    int count = std::min(limit, (int)words.size());
     for (int i = 0; i < count; i++) {
         out += words[i];
         if (i < count - 1) out += " ";
