@@ -12,7 +12,7 @@ add_executable(1 main.cpp
         include/core/UserStore.h
         src/index/Trie.cpp
         include/index/Trie.h
-        src/core/WordIndex.cpp
+        src/index/WordIndex.cpp
         include/index/WordIndex.h
         src/index/NgramIndex.cpp
         include/index/NgramIndex.h
