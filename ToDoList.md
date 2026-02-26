@@ -8,15 +8,15 @@
   - [X] `tests/`
   - [X] `docs/`
 - [X] Definir estándar de compilación (C++17 o C++20) + `CMakeLists.txt`
-- [ ] Crear “modo demo” (main) con menú básico (sin búsquedas aún)
+- [X] Crear “modo demo” (main) con menú básico (sin búsquedas aún)
 
 
 ---
 
 ## B. Carga y preprocesamiento del dataset
-- [ ] Descargar dataset y guardarlo en `data/`
-- [ ] Confirmar separador real
-- [ ] Implementar `Catalog::load(file)` que cargue las 1428 filas
+- [X] Descargar dataset y guardarlo en `data/`
+- [X] Confirmar separador real
+- [X] Implementar `Catalog::load(file)` que cargue las 1428 filas
 - [ ] Implementar preprocesamiento:
   - [ ] `normalize(text)` → minúsculas + limpiar signos + colapsar espacios
   - [ ] `split_tags("cult, horror,...")` → `vector<string>` con trim
@@ -24,14 +24,14 @@
     - [ ] `title_norm`
     - [ ] `synopsis_norm`
     - [ ] `text_compact` (sin espacios) para substring/verify
-- [ ] Log de validación: imprimir 3 películas + contar tags
+- [X] Log de validación: imprimir 3 películas + contar tags
 
 
 ---
 
 ## C. Modelo de datos (clases ADT)
-- [ ] Clase `Movie` (id, imdb_id, title, synopsis, tags, campos normalizados)
-- [ ] Clase `UserState` (likes, ver_mas_tarde)
+- [X] Clase `Movie` (id, imdb_id, title, synopsis, tags, campos normalizados)
+- [X] Clase `UserState` (likes, ver_mas_tarde)
 - [ ] Clase `SearchResult` (movie_id, score, razones opcional)
 
 
@@ -51,8 +51,8 @@
 ---
 
 ## E. Índice para substring: búsqueda por string “bar” (Trie de n-gramas)
-- [ ] Elegir n (recomendado **3**: trigramas)
-- [ ] Implementar `TrieIndexNgrams`:
+- [X] Elegir n (recomendado **3**: trigramas)
+- [X] Implementar `TrieIndexNgrams`:
   - [ ] `insert(ngram, movie_id)`
   - [ ] `find(ngram)` → candidatos
 - [ ] Query substring:
@@ -101,11 +101,11 @@
 ---
 
 ## I. Persistencia del usuario (para que al iniciar se mantenga)
-- [ ] Guardar `UserState` a archivo (`user_state.txt` o JSON simple)
-- [ ] Cargar al iniciar
-- [ ] Al iniciar, mostrar:
-  - [ ] lista “Ver más tarde”
-  - [ ] recomendados basados en likes
+- [X] Guardar `UserState` a archivo (`user_state.txt` o JSON simple)
+- [X] Cargar al iniciar
+- [X] Al iniciar, mostrar:
+  - [] lista “Ver más tarde”
+  - [] recomendados basados en likes
 
 
 ---

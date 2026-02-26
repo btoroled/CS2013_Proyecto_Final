@@ -16,15 +16,21 @@ public:
 
     int insertAndGetId(const std::string& key) {
         int cur = 0;
+
         for (unsigned char ch : key) {
             if (ch >= 128) continue;
-            int& nxt = nodes_[cur].next[ch];
+
+            int nxt = nodes_[cur].next[ch];
+
             if (nxt == -1) {
                 nxt = (int)nodes_.size();
+                nodes_[cur].next[ch] = nxt;
                 nodes_.push_back(Node{});
             }
+
             cur = nxt;
         }
+
         if (nodes_[cur].term_id == -1) nodes_[cur].term_id = next_term_id_++;
         return nodes_[cur].term_id;
     }

@@ -39,7 +39,7 @@ std::string text::normalize_ascii(std::string_view in) {
                 }
             }
         } else {
-            // si viene UTF-8 (tildes, etc.), lo tratamos como separador
+            // Si viene UTF-8 (tildes, etc.), lo tratamos como separador.
             if (!lastSpace) {
                 out.push_back(' ');
                 lastSpace = true;
