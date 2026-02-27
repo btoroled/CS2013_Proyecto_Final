@@ -369,94 +369,62 @@ vector<SearchResult> StreamingPlatform::search(const std::string& user_input) co
 }
 
 vector<int> StreamingPlatform::recommend(const User& u, int k) const {
-    // perfil de tags basado en likes
+    // Métrica 1: Perfil de tags basado en likes
     unordered_map<string, int> tagFreq;
+     //Métrica 2: palabras frecuentes en títulos likeados
+    unordered_map<string, int> wordFreq;
 
     for (const auto& imdb : u.liked) {
         int id = idByImdb(imdb);
         if (id < 0) continue;
+        //acumular tags
         for (const auto& t : movies_[id].tags) tagFreq[t]++;
+        // acumular palabras del título
+        for (const auto& w : text::split_words(movies_[id].title_norm))
+            if (w.size() >= 3) wordFreq[w]++; // ignorar palabras muy cortas
     }
-
     // si no hay likes, recomendar random global
     if (tagFreq.empty()) {
         vector<int> all;
         all.reserve(movies_.size());
         for (const auto& m : movies_) all.push_back(m.id);
-
         std::mt19937 rng((unsigned)std::random_device{}());
         std::shuffle(all.begin(), all.end(), rng);
         if ((int)all.size() > k) all.resize(k);
         return all;
     }
-
-    unordered_set<string> likedSet = u.liked;
+    // Excluir liked y watch_later
+    unordered_set<string> excluded = u.liked;
+    for (const auto& imdb : u.watch_later)
+        excluded.insert(imdb);
+    //Scoring: 
+        //score = Σ tagFreq[tag] * 2  (peso mayor)
+        //        + Σ wordFreq[word]    (bonus por palabras del título)
 
     vector<pair<int,double>> scored;
-    unsigned T = effectiveThreads(movies_.size());
-    if (T == 0) T = 1;
-
-    if (T <= 1 || movies_.size() < 4000) {
-        scored.reserve(movies_.size());
-        for (const auto& m : movies_) {
-            if (likedSet.count(m.imdb_id)) continue;
-
-            double s = 0.0;
-            for (const auto& t : m.tags) {
-                auto it = tagFreq.find(t);
-                if (it != tagFreq.end()) s += it->second;
-            }
-            if (s > 0.0) scored.push_back({m.id, s});
+    scored.reserve(movies_.size());
+    for (const auto& m : movies_) {
+        if (excluded.count(m.imdb_id)) continue; // no recomendar ya likeado
+        double s = 0.0;
+        // componente 1: similitud por tags
+        for (const auto& t : m.tags) {
+            auto it = tagFreq.find(t);
+            if (it != tagFreq.end()) s += it->second*2.0;
         }
-    } else {
-        T = std::min<unsigned>(T, (unsigned)movies_.size());
-        const size_t n = movies_.size();
-        const size_t chunk = (n + T - 1) / T;
-
-        std::vector<std::vector<pair<int,double>>> localScored(T);
-        std::vector<std::thread> threads;
-        threads.reserve(T);
-
-        for (unsigned ti = 0; ti < T; ti++) {
-            const size_t begin = (size_t)ti * chunk;
-            const size_t end   = std::min(n, begin + chunk);
-
-            threads.emplace_back([&, ti, begin, end]() {
-                auto& out = localScored[ti];
-                out.reserve((end - begin) / 2 + 8);
-
-                for (size_t i = begin; i < end; i++) {
-                    const auto& m = movies_[i];
-                    if (likedSet.count(m.imdb_id)) continue;
-
-                    double s = 0.0;
-                    for (const auto& t : m.tags) {
-                        auto it = tagFreq.find(t);
-                        if (it != tagFreq.end()) s += it->second;
-                    }
-                    if (s > 0.0) out.push_back({m.id, s});
-                }
-            });
+        // componente 2: bonus por palabras frecuentes en título
+        for (const auto& w : text::split_words(m.title_norm)) {
+            auto it = wordFreq.find(w);
+            if (it != wordFreq.end()) s += it->second * 1.0;
         }
-        for (auto& th : threads) th.join();
-
-        size_t total = 0;
-        for (const auto& v : localScored) total += v.size();
-        scored.reserve(total);
-        for (auto& v : localScored) {
-            scored.insert(scored.end(), v.begin(), v.end());
-        }
+        if (s > 0.0) scored.push_back({m.id, s});
     }
-
     sort(scored.begin(), scored.end(), [&](auto& a, auto& b){
         if (a.second != b.second) return a.second > b.second;
         return movies_[a.first].title < movies_[b.first].title;
     });
-
     vector<int> out;
     for (int i = 0; i < (int)scored.size() && (int)out.size() < k; i++)
         out.push_back(scored[i].first);
-
     return out;
 }
 
