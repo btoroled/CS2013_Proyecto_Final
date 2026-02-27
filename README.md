@@ -8,6 +8,8 @@ Plataforma de streaming (CLI) con **búsqueda eficiente** y **recomendaciones** 
 - **Hector Miguel Espinoza Torres**
 - **Leonardo Medina Gago**
 
+VIDEO: https://youtu.be/G5WTTPlChWQ
+
 ---
 
 ## Descripción del proyecto
@@ -461,4 +463,18 @@ Queries usadas:
 
 ---
 
+## Referencias APA
 
+Gamma, E., Helm, R., Johnson, R., & Vlissides, J. (1994). Design patterns: Elements of reusable object-oriented software (1st ed.). Addison-Wesley Professional.
+
+Fowler, M., Rice, D., Foemmel, M., Hieatt, E., Mee, R., & Stafford, R. (2002). Patterns of enterprise application architecture (1st ed.). Addison-Wesley Professional.
+
+Hieatt, E., & Mee, R. (2003, March 5). Repository. En M. Fowler (Ed.), Catalog of Patterns of Enterprise Application Architecture. Recuperado el 26 de febrero de 2026.
+
+Evans, E. (2003). Domain-driven design: Tackling complexity in the heart of software (1st ed.). Addison-Wesley Professional.
+
+Fowler, M. (2004, January 23). Inversion of Control Containers and the Dependency Injection pattern. Recuperado el 26 de febrero de 2026.
+
+Microsoft. (2026, January 28). Dependency injection – .NET (Documentation). Microsoft Learn.
+
+Microsoft. (2023, February 20). Designing the infrastructure persistence layer (Repository pattern). Microsoft Learn.
