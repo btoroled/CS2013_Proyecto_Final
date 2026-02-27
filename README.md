@@ -27,18 +27,18 @@ El objetivo principal es demostrar el uso de **estructuras eficientes** para bú
 ## Estructura del proyecto
 ```txt
 include/
-  core/     -> Movie, User, StreamingPlatform, UserStore
+  core/     -> Movie, User, StreamingPlatform, UserStore, Session, UserHistory
   index/    -> Trie, WordIndex, NgramIndex
   ui/       -> UI (menús por consola)
   text/     -> TextUtils (normalización y parsing)
 src/
-  core/
+  core/     -> StreamingPlatform.cpp, UserStore.cpp, Session.cpp
   index/
   ui/
   text/
 data/
   movies.csv
-users.txt   -> se genera automáticamente (persistencia de perfiles)
+users.txt   -> se genera automáticamente (persistencia de perfiles / snapshots)
 main.cpp
 CMakeLists.txt
 README.md
@@ -101,12 +101,10 @@ tt1234567,Movie Title,"A long synopsis...","['Drama','Comedy']",train,imdb
 ---
 ## Uso del programa (flujo general)
 
-### 1) Pantalla de perfiles
+### 1) Pantalla de perfiles / Sesión
 - Se muestran **4 slots** (máximo 4 usuarios).
-- Puedes:
-    - Elegir un perfil existente.
-    - Crear uno si el slot está vacío.
-    - (Opcional según implementación) Borrar un perfil.
+- Solo puede existir **1 usuario activo por sesión** (enforced por `Session`).
+- Para **cambiar de perfil**, primero se **cierra sesión** (logout) y se selecciona otro slot.
 
 ### 2) Home
 - Muestra recomendaciones personalizadas.
@@ -116,24 +114,152 @@ tt1234567,Movie Title,"A long synopsis...","['Drama','Comedy']",train,imdb
 
 ### 3) Búsqueda
 La búsqueda soporta:
-
 - **Búsqueda normal**
-    - Ej: `batman`, `space travel`, `love story`
+  - Ej: `batman`, `space travel`, `love story`
 - **Búsqueda por tag**
-    - Ej: `tag:horror`, `tag:action`
+  - Ej: `tag:horror`, `tag:action`
+- **Búsqueda por fragmentos (substring)**
+  - Soportada por `NgramIndex` (n-grams).
 
 ---
 
 ## Persistencia de usuarios (`users.txt`)
 
-Los perfiles y sus listas se guardan automáticamente en un archivo de texto.
+Los perfiles y sus listas se guardan automáticamente en un archivo de texto versionado.
 
 Características:
 - Máximo **4 usuarios**
 - Guarda:
-    - nombre
-    - imdb_ids de liked
-    - imdb_ids de watch_later (mantiene orden)
+  - nombre
+  - imdb_ids de `liked` (set)
+  - imdb_ids de `watch_later` (mantiene orden)
+- **Formato versionado** (para robustez al leer/escribir)
+
+**Evidencia en código (snippet):**
+``cpp
+// UserStore::save(...)
+out << "VERSION 1\n";
+out << "SLOTS " << MAX_USERS << "\n";
+´´
+
+---
+
+## Patrones de diseño
+
+> Patrones **GoF implementados**: **Singleton**, **State**, **Memento**.  
+> Patrones/estilos **arquitectónicos aplicados**: **Facade**, **Repository**, **Dependency Injection**.
+
+---
+
+### 1) Singleton — Sesión única global (`Session`)
+**Qué resuelve:** garantiza una sola sesión activa en toda la app.
+
+**Dónde:** `include/core/Session.h`, `src/core/Session.cpp`
+
+**Snippet:**
+cpp
+// Session.h
+static Session& instance();
+Session(const Session&) = delete;
+Session& operator=(const Session&) = delete;
+
+// Session.cpp
+Session& Session::instance() {
+static Session s;
+return s;
+}
+
+### 2) State (GoF) — LoggedOut / LoggedIn controlan el login
+
+Qué resuelve: el comportamiento de login() cambia según estado:
+
+LoggedOut permite login
+
+LoggedIn bloquea doble-login (cumple el enunciado)
+
+Dónde: include/core/Session.h, src/core/Session.cpp
+
+// Session.h
+struct State {
+virtual bool login(Session&, UserStore&, int) = 0;
+virtual void logout(Session&) = 0;
+virtual bool logged() const = 0;
+};
+
+// Session.cpp  (clave: bloquea doble login)
+bool login(Session&, UserStore&, int) override {
+return false;
+}
+
+### 3) Memento (GoF) — Snapshot/Restore de usuarios + Caretaker (Undo/Redo)
+
+Qué resuelve: capturar/restaurar el estado completo de UserStore para deshacer/rehacer cambios.
+
+Roles GoF:
+
+Originator: UserStore
+
+Memento: UserStore::Memento (snapshot)
+
+Caretaker: UserHistory (stacks undo/redo)
+
+Dónde: include/core/UserHistory.h (+ UserStore para snapshot/restore)
+
+Snippet (Caretaker):
+
+// UserHistory.h
+void checkpoint(const UserStore& store) {
+undo_.push_back(store.snapshot());
+redo_.clear();
+}
+
+bool undo(UserStore& store) {
+if (undo_.empty()) return false;
+redo_.push_back(store.snapshot());
+store.restore(undo_.back());
+undo_.pop_back();
+return true;
+}
+
+### 4) Facade — StreamingPlatform simplifica el subsistema
+
+Qué resuelve: expone una API de alto nivel para UI, ocultando índices/estructuras internas.
+
+Dónde: StreamingPlatform.h/.cpp
+
+Snippet:
+// StreamingPlatform.h (API de alto nivel)
+bool loadDataset(const std::string& path);
+void buildIndexes();
+std::vector<SearchResult> search(const std::string& user_input) const;
+std::vector<int> recommend(const User& u, int k) const;
+
+### 5) Repository — UserStore centraliza persistencia y acceso a usuarios
+
+Qué resuelve: separa UI de la persistencia y CRUD de perfiles.
+
+Dónde: UserStore.h/.cpp
+
+Snippet:
+bool load(const std::string& path);
+bool save(const std::string& path) const;
+
+void create(int slot, std::string name);
+void remove(int slot);
+User& get(int slot);
+bool has(int slot) const;
+
+### 6) Dependency Injection — UI recibe dependencias por constructor
+
+Qué resuelve: reduce acoplamiento y facilita pruebas/mantenimiento.
+
+Dónde: UI.h, main.cpp
+
+Snippet:
+// main.cpp
+StreamingPlatform platform;
+UserStore users;
+UI ui(platform, users, USERS_FILE);
 
 ---
 ## Librerías usadas
@@ -178,6 +304,17 @@ Se usan dos estructuras principales:
 - convertir a minúsculas.
 - eliminar símbolos y colapsar espacios.
 - parsing de tags (ej. `["A","B"]`, `'tag1,tag2'`, etc.).
+
+### `Session` (core) — Singleton + State
+Responsable de:
+- Mantener el **usuario activo** en la ejecución.
+- Asegurar que **no existan dos usuarios activos** simultáneamente.
+- Controlar el flujo `login/logout` mediante estados `LoggedOut/LoggedIn`.
+
+### `UserHistory` (core) — Caretaker de Memento
+Responsable de:
+- Registrar **checkpoints** del estado de usuarios.
+- Ejecutar `undo()` / `redo()` restaurando snapshots.
 
 ---
 ## Algoritmo de ranking (búsqueda)
@@ -319,7 +456,8 @@ Queries usadas:
 - El uso de **índices invertidos + Trie** permite búsquedas rápidas por palabras y tags.
 - El índice de **n-grams** soporta búsqueda por fragmentos sin escanear todo el dataset.
 - La separación por módulos (`core`, `index`, `ui`, `text`) mejora mantenimiento y escalabilidad.
-- La persistencia permite mantener historial entre ejecuciones.
+- La sesión única (**Singleton + State**) cumple el requisito de “un usuario por sesión”.
+- El manejo de estado de usuarios mediante **Memento** permite restaurar cambios (undo/redo) y mantener consistencia.
 
 ---
 
