@@ -14,8 +14,11 @@
 #include "./User.h"
 #include "../text/TextUtils.h"
 
+
+
 class UserStore {
 public:
+
     static constexpr int MAX_USERS = 4;
 
     bool load(const std::string& path) {
@@ -129,6 +132,13 @@ public:
     User& get(int slot) { return users_.at(slot); }
     const User& get(int slot) const { return users_.at(slot); }
 
+    struct Memento {
+        std::array<User, MAX_USERS> users;
+        std::array<bool, MAX_USERS> used;
+    };
+
+    Memento snapshot() const { return Memento{users_, used_}; }
+    void restore(const Memento& m) { users_ = m.users; used_ = m.used; }
 private:
     std::array<User, MAX_USERS> users_{};
     std::array<bool, MAX_USERS> used_{false, false, false, false};
@@ -137,6 +147,8 @@ private:
         for (int i = 0; i < MAX_USERS; i++) { users_[i] = User{}; used_[i] = false; }
     }
 };
+
+
 
 
 #endif //INC_1_USERSTORE_H

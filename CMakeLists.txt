@@ -23,4 +23,8 @@ add_executable(1 main.cpp
         src/ui/UI.cpp
         include/ui/UI.h
         src/text/TextUtils.cpp
-        include/text/TextUtils.h)
+        include/text/TextUtils.h
+        src/core/Session.cpp
+        include/core/Session.h
+        src/core/UserHistory.cpp
+        include/core/UserHistory.h)

@@ -9,10 +9,13 @@
 #include <vector>
 #include "../core/StreamingPlatform.h"
 #include "../core/UserStore.h"
+#include "../core/Session.h"
+#include "../core/UserHistory.h"
 
 class UI {
 public:
     UI(StreamingPlatform& platform, UserStore& users, const std::string& usersFile);
+
 
     void run();
 
@@ -21,6 +24,7 @@ private:
     UserStore& users_;
     std::string usersFile_;
     std::string lastQuery_;
+    UserHistory history_;
 
     // terminal helpers
     static void clear();

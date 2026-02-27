@@ -232,11 +232,14 @@ int UI::profilesScreen() {
         int choice = readInt();
         if (choice == 0) return -1;
 
-        if (choice == 5) {
+
+
+        if (choice == 5) {  // BORRAR
             clear();
             cout << "Borrar perfil: elige slot (1-4) o 0 cancelar\n";
             int s = readInt();
             if (s >= 1 && s <= 4) {
+                history_.checkpoint(users_);
                 users_.remove(s - 1);
                 users_.save(usersFile_);
             }
@@ -244,6 +247,13 @@ int UI::profilesScreen() {
         }
 
         if (choice < 1 || choice > 4) continue;
+        if (choice == 7) {
+            if (history_.undo(users_)) users_.save(usersFile_);
+            else { cout << "Nada para deshacer.\n"; pause(); }
+        } else if (choice == 8) {
+            if (history_.redo(users_)) users_.save(usersFile_);
+            else { cout << "Nada para rehacer.\n"; pause(); }
+        }
 
         int slot = choice - 1;
 
@@ -260,6 +270,7 @@ int UI::profilesScreen() {
         cout << "=== Crear usuario (" << (users_.countUsers() + 1) << "/" << UserStore::MAX_USERS << ") ===\n";
         cout << "Nombre: ";
         string name = readLineTrim();
+        history_.checkpoint(users_);
         users_.create(slot, name);
         users_.save(usersFile_);
         return slot;
@@ -300,6 +311,7 @@ void UI::movieDetailScreen(int slot, int movie_id) {
         if (op == 1) {
             if (!liked) user.liked.insert(m.imdb_id);
             else user.liked.erase(m.imdb_id);
+            history_.checkpoint(users_);
             users_.save(usersFile_);
         } else if (op == 2) {
             if (!wl) user.watch_later.push_back(m.imdb_id);
@@ -307,6 +319,7 @@ void UI::movieDetailScreen(int slot, int movie_id) {
                 auto it = find(user.watch_later.begin(), user.watch_later.end(), m.imdb_id);
                 if (it != user.watch_later.end()) user.watch_later.erase(it);
             }
+            history_.checkpoint(users_);
             users_.save(usersFile_);
         }
     }
@@ -576,7 +589,7 @@ void UI::homeScreen(int slot) {
         char c = (char)std::tolower((unsigned char)cmd[0]);
 
         if (c == 'q') std::exit(0);
-        if (c == 'p') return; // cambiar perfil
+        if (c == 'p') {Session::instance().logout(); return;} // cambiar perfil
         if (c == '/') {
             searchScreen(slot);
             buildRows();
@@ -622,6 +635,7 @@ void UI::homeScreen(int slot) {
                 const Movie& m = platform_.movieById(rows[selRow].ids[selCol]);
                 if (u.liked.count(m.imdb_id)) u.liked.erase(m.imdb_id);
                 else u.liked.insert(m.imdb_id);
+                history_.checkpoint(users_);
                 users_.save(usersFile_);
                 buildRows();
             }
@@ -631,6 +645,7 @@ void UI::homeScreen(int slot) {
                 auto it = std::find(u.watch_later.begin(), u.watch_later.end(), m.imdb_id);
                 if (it != u.watch_later.end()) u.watch_later.erase(it);
                 else u.watch_later.push_back(m.imdb_id);
+                history_.checkpoint(users_);
                 users_.save(usersFile_);
                 buildRows();
             }
@@ -643,9 +658,23 @@ void UI::homeScreen(int slot) {
 
 
 void UI::run() {
+    auto& ses = Session::instance();
+
     while (true) {
+        ses.logout();          // seguridad
+        history_.clear();
+
         int slot = profilesScreen();
         if (slot < 0) return;
+
+        if (!ses.login(users_, slot)) {
+            // Si esto pasa, es porque alguien intentó loguear con sesión ocupada
+            cout << "ERROR: ya hay una sesion activa.\n";
+            pause();
+            continue;
+        }
+
+        history_.checkpoint(users_); // estado base para poder undo
         homeScreen(slot);
     }
 }
